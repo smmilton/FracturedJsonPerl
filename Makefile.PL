@@ -7,7 +7,7 @@ WriteMakefile(
     NAME             => 'FracturedJson',
     VERSION_FROM     => 'lib/FracturedJson.pm',
     ABSTRACT         => 'Format JSON/JSONC in a fractured style',
-    AUTHOR           => 'Jesse Brooke (https://github.com/j-brooke), smmilton (https://github.com/smmilton)',
+    AUTHOR           => 'Jesse Brooke (https://github.com/j-brooke), Stephen Milton (https://github.com/smmilton)',
     LICENSE          => 'mit',
     MIN_PERL_VERSION => '5.010',
     EXE_FILES        => ['bin/fjson'],
