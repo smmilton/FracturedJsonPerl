@@ -1,0 +1,141 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Getopt::Long qw(GetOptions);
+
+use FracturedJson::Formatter;
+use FracturedJson::Options;
+use FracturedJson::CommentPolicy qw(TreatAsError Preserve Remove);
+use FracturedJson::EolStyle qw(Lf Crlf);
+
+binmode(STDOUT, ':encoding(UTF-8)');
+
+sub usage {
+    print STDERR <<'USAGE';
+Usage: fjson [options] [file ...]
+
+Reads JSON/JSONC from files or STDIN and formats it.
+
+Options:
+  --minify                  Minify output instead of pretty-formatting
+  --preserve-comments       Keep comments (JSONC) in output
+  --remove-comments         Strip comments from output
+  --allow-trailing-commas   Accept trailing commas in input
+  --preserve-blank-lines    Keep blank lines that appear in input
+  --crlf                    Use CRLF line endings in output (default LF)
+  --indent-spaces N         Indent width (default 4)
+  --max-line-length N       MaxTotalLineLength (default 120)
+  --always-expand-depth N   AlwaysExpandDepth (default -1)
+  -h, --help                Show this help
+USAGE
+    exit 1;
+}
+
+my $mode_minify = 0;
+my $preserve_comments = 0;
+my $remove_comments = 0;
+my $allow_trailing = 0;
+my $preserve_blank = 0;
+my $crlf = 0;
+my $indent_spaces = 4;
+my $max_line = 120;
+my $always_expand = -1;
+
+GetOptions(
+    'minify'                 => \$mode_minify,
+    'preserve-comments'      => \$preserve_comments,
+    'remove-comments'        => \$remove_comments,
+    'allow-trailing-commas'  => \$allow_trailing,
+    'preserve-blank-lines'   => \$preserve_blank,
+    'crlf'                   => \$crlf,
+    'indent-spaces=i'        => \$indent_spaces,
+    'max-line-length=i'      => \$max_line,
+    'always-expand-depth=i'  => \$always_expand,
+    'help|h'                 => sub { usage() },
+) or usage();
+
+if ($preserve_comments && $remove_comments) {
+    die "Choose either --preserve-comments or --remove-comments, not both\n";
+}
+
+my $opts = FracturedJson::Options->new();
+$opts->{IndentSpaces} = $indent_spaces;
+$opts->{MaxTotalLineLength} = $max_line;
+$opts->{AlwaysExpandDepth} = $always_expand;
+$opts->{AllowTrailingCommas} = $allow_trailing;
+$opts->{PreserveBlankLines} = $preserve_blank;
+$opts->{JsonEolStyle} = $crlf ? Crlf : Lf;
+if ($preserve_comments) {
+    $opts->{CommentPolicy} = Preserve;
+    $opts->{PreserveBlankLines} = 1 if $preserve_blank;
+}
+elsif ($remove_comments) {
+    $opts->{CommentPolicy} = Remove;
+}
+else {
+    $opts->{CommentPolicy} = TreatAsError;
+}
+
+my @inputs = @ARGV;
+if (!@inputs) {
+    local $/;
+    my $data = <STDIN> // '';
+    process_text($data, $opts, $mode_minify);
+} else {
+    foreach my $file (@inputs) {
+        open my $fh, '<', $file or die "Cannot open $file: $!\n";
+        local $/;
+        my $data = <$fh> // '';
+        close $fh;
+        process_text($data, $opts, $mode_minify);
+    }
+}
+
+sub process_text {
+    my ($text, $opts, $do_minify) = @_;
+    my $formatter = FracturedJson::Formatter->new();
+    $formatter->{Options} = $opts;
+    my $out;
+    eval {
+        if ($do_minify) {
+            $out = $formatter->Minify($text);
+        }
+        else {
+            $out = $formatter->Reformat($text, 0);
+        }
+    };
+    if ($@) {
+        die "Error: $@\n";
+    }
+    print $out;
+    print "\n" unless $out =~ /\n\z/;
+}
+
+__END__
+
+=head1 NAME
+
+fjson - Format JSON/JSONC using FracturedJson
+
+=head1 SYNOPSIS
+
+  fjson file.json
+  fjson --minify file.json
+  cat file.jsonc | fjson --preserve-comments
+
+=head1 DESCRIPTION
+
+C<fjson> reads JSON (and optionally JSONC) from one or more files, or from STDIN,
+and writes formatted output to STDOUT.
+
+=head1 AUTHOR
+
+Original author: https://github.com/j-brooke
+
+Perl port: https://github.com/smmilton
+
+=head1 LICENSE
+
+MIT License. See C<LICENSE>.
+
+=cut
